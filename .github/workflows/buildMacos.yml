@@ -1,0 +1,59 @@
+name: Build macOS app
+
+on:
+  push:
+    branches:
+      - fix/event-tap-recovery
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.0.1.app/Contents/Developer
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build universal macOS app
+        run: |
+          xcodebuild \
+            -project docklock.xcodeproj \
+            -scheme docklock \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath build/DerivedData \
+            ARCHS='arm64 x86_64' \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM= \
+            build
+
+      - name: Sign and package application
+        run: |
+          app_path='build/DerivedData/Build/Products/Release/docklock.app'
+          codesign --force --options runtime --sign - "$app_path"
+          codesign --verify --deep --strict "$app_path"
+          lipo -verify_arch arm64 x86_64 "$app_path/Contents/MacOS/docklock"
+          mkdir -p build/artifacts
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$app_path" build/artifacts/DockLock-macos-universal.zip
+
+      - name: Upload application
+        uses: actions/upload-artifact@v4
+        with:
+          name: DockLock-macos-universal
+          path: build/artifacts/DockLock-macos-universal.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
