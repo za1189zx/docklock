@@ -44,7 +44,7 @@ jobs:
           app_path='build/DerivedData/Build/Products/Release/docklock.app'
           codesign --force --options runtime --sign - "$app_path"
           codesign --verify --deep --strict "$app_path"
-          lipo -verify_arch arm64 x86_64 "$app_path/Contents/MacOS/docklock"
+          lipo "$app_path/Contents/MacOS/docklock" -verify_arch arm64 x86_64
           mkdir -p build/artifacts
           ditto -c -k --sequesterRsrc --keepParent \
             "$app_path" build/artifacts/DockLock-macos-universal.zip
